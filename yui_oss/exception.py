@@ -11,8 +11,29 @@ class YuiException(Exception):
     pass
 
 
-class TaskStoptimeException(YuiException):
+class YuiUploadException(YuiException):
     """
-    raised when a task encounters errors while stopping
+    raised when error occurred while uploading files
+    """
+    pass
+
+
+class YuiDownloadException(YuiException):
+    """
+    raised when error occurred while uploading files
+    """
+    pass
+
+
+class YuiDeleteException(YuiException):
+    """
+    raised when error occurred while uploading files
+    """
+    pass
+
+
+class YuiMoveException(YuiException):
+    """
+    raised when error occurred while uploading files
     """
     pass

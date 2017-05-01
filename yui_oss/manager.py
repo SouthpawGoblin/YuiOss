@@ -2,14 +2,15 @@
 class for manipulating objects
 """
 from . import utils
-from .file import BaseFileManager
+from .exception import *
 import oss2
 import os
 import binascii
 import base64
+import re
 
 
-class OssFileManager(BaseFileManager):
+class OssFileManager:
     """
     class for managing oss files
     """
@@ -26,12 +27,12 @@ class OssFileManager(BaseFileManager):
         auth = oss2.Auth(auth_key, auth_key_secret)
         self.__bucket = oss2.Bucket(auth, endpoint, bucket_name, enable_crc=False)
 
-    def get_md5(self, remote, *args, **kwargs):
+    def get_md5(self, remote):
         """
         try get file md5 from header 'Content-MD5',
         if failed return etag
-        :param remote:
-        :return:
+        :param remote: abs oss path, directory should end with '/'
+        :return: md5 string
         """
         try:
             remote = OssFileManager.norm_path(remote)
@@ -41,25 +42,31 @@ class OssFileManager(BaseFileManager):
             else:
                 return head.etag
         except Exception as e:
-            raise e
+            raise YuiException(e)
 
-    def is_exist(self, remote, *args, **kwargs):
+    def is_exist(self, remote):
         """
         wrapper for Bucket.object_exists()
-        :param remote:
-        :return:
+        :param remote: abs oss path, directory should end with '/'
+        :return: boolean
         """
         try:
             remote = OssFileManager.norm_path(remote)
             return self.__bucket.object_exists(remote)
         except Exception as e:
-            raise e
+            raise YuiException(e)
 
-    def upload(self, local, remote, recursive=False, on_success=None, on_error=None, progress_callback=None, *args, **kwargs):
+    def upload(self, local, remote, recursive=False, on_success=None, on_error=None, progress_callback=None):
         """
-        upload a file
-        :param local:
-        :param remote:
+        upload a file/directory to OSS
+        if `local` is a directory and `recursive` set to True, all contents will be uploaded recursively
+        if http status of upload result >= 400, `on_error` callback will be called, else `on_success` will be called
+        `local`, `remote` and upload result object will be passed to callback methods
+        :param local: local source path
+        :param remote: abs oss path, directory should end with '/'
+        :param recursive: boolean
+        :param on_success: success callback
+        :param on_error: error callback
         :param progress_callback:
         :return: class:`PutObjectResult <oss2.models.PutObjectResult>`
         """
@@ -70,7 +77,7 @@ class OssFileManager(BaseFileManager):
             remote = OssFileManager.norm_path(remote)
             if os.path.isdir(local):
                 if OssFileManager.is_dir(remote):
-                    dest_remote = remote + '/' + os.path.split(local)[-1] + '/'
+                    dest_remote = remote + os.path.split(local)[-1] + '/'
                 else:
                     raise Exception("remote path should be a directory")
                 md5 = OssFileManager.LOCAL_DIR_CONTENT_MD5
@@ -80,10 +87,12 @@ class OssFileManager(BaseFileManager):
                                                   progress_callback=progress_callback)
                 if recursive:
                     for subdir in os.listdir(local):
-                        self.upload(os.path.join(local, subdir), dest_remote)
+                        self.upload(os.path.join(local, subdir), dest_remote,
+                                    on_success=on_success, on_error=on_error,
+                                    recursive=True, progress_callback=progress_callback)
             else:
                 if OssFileManager.is_dir(remote):
-                    dest_remote = remote + '/' + os.path.split(local)[-1]
+                    dest_remote = remote + os.path.split(local)[-1]
                 else:
                     dest_remote = remote
                 md5 = utils.file_md5(local)
@@ -91,16 +100,22 @@ class OssFileManager(BaseFileManager):
                 result = self.__bucket.put_object_from_file(dest_remote, local,
                                                             headers={OssFileManager.MD5_HEADER_STRING: md5_b64},
                                                             progress_callback=progress_callback)
+
             print("object put | \"" + local + "\" --> \"" + remote + "\"")
+            on_error(local, remote, result) if on_error and result.status >= 400 \
+                else on_success(local, remote, result) if on_success else None
             return result
         except Exception as e:
-            raise e
+            raise YuiUploadException(e)
 
-    def download(self, remote, local, recursive=False, on_success=None, on_error=None, progress_callback=None, *args, **kwargs):
+    def download(self, remote, local, recursive=False, on_success=None, on_error=None, progress_callback=None):
         """
         download a file
         :param remote:
         :param local:
+        :param recursive:
+        :param on_success:
+        :param on_error:
         :param progress_callback:
         :return:
         """
@@ -116,10 +131,13 @@ class OssFileManager(BaseFileManager):
         except Exception as e:
             raise e
 
-    def delete(self, remote, recursive=False, on_success=None, on_error=None, *args, **kwargs):
+    def delete(self, remote, recursive=False, on_success=None, on_error=None):
         """
         delete a file
         :param remote:
+        :param recursive:
+        :param on_success:
+        :param on_error:
         :return: class:`RequestResult <oss2.models.RequestResult>`
         """
         try:
@@ -130,11 +148,13 @@ class OssFileManager(BaseFileManager):
         except Exception as e:
             raise e
 
-    def rename(self, remote_old, remote_new, on_success=None, on_error=None, *args, **kwargs):
+    def rename(self, remote_old, remote_new, on_success=None, on_error=None):
         """
         rename a file using Bucket.copy_object() first then delete the original
         :param remote_old:
         :param remote_new:
+        :param on_success:
+        :param on_error:
         :return:
         """
         try:
@@ -146,7 +166,7 @@ class OssFileManager(BaseFileManager):
         except Exception as e:
             raise e
 
-    def get_iterator(self, root='', delimiter='', *args, **kwargs):
+    def get_iterator(self, root='', delimiter=''):
         """
         return object iterator with specified prefix and/or delimiter
         :param root:

@@ -35,8 +35,8 @@ class OssFileManagerTest(unittest.TestCase):
             file_ch.write(self._file_content_ch)
 
     def test_upload(self):
-        res = self.fm.upload(self._dir_en + self._file_en,
-                             self.fm.norm_path(self._dir_en + self._file_en))
+        res = self.fm.upload(self._root,
+                             self.fm.norm_path('YuiOss_test/'), recursive=True)
         self.assertEqual(res.status, 200, "test_upload failed")
 
     def tearDown(self):
