@@ -1,0 +1,191 @@
+"""
+class for manipulating objects
+"""
+from . import utils
+from .file import BaseFileManager
+import oss2
+import os
+import binascii
+import base64
+
+
+class OssFileManager(BaseFileManager):
+    """
+    class for managing oss files
+    """
+
+    # since bucket.upload() may get 407 when content is empty,
+    # I give all directory objects "$DIR$" as content
+    LOCAL_DIR_CONTENT = "$DIR$"
+    # MD5 of DIR_CONTENT, local folders will get this MD5 as etag, but md5 of a dir will never be used
+    LOCAL_DIR_CONTENT_MD5 = utils.content_md5(LOCAL_DIR_CONTENT)
+
+    MD5_HEADER_STRING = 'Content-MD5'
+
+    def __init__(self, auth_key, auth_key_secret, endpoint, bucket_name):
+        auth = oss2.Auth(auth_key, auth_key_secret)
+        self.__bucket = oss2.Bucket(auth, endpoint, bucket_name, enable_crc=False)
+
+    def get_md5(self, remote, *args, **kwargs):
+        """
+        try get file md5 from header 'Content-MD5',
+        if failed return etag
+        :param remote:
+        :return:
+        """
+        try:
+            remote = OssFileManager.norm_path(remote)
+            head = self.__bucket.head_object(remote)
+            if OssFileManager.MD5_HEADER_STRING in head.headers:
+                return OssFileManager.base64_to_md5(head.headers[OssFileManager.MD5_HEADER_STRING])
+            else:
+                return head.etag
+        except Exception as e:
+            raise e
+
+    def is_exist(self, remote, *args, **kwargs):
+        """
+        wrapper for Bucket.object_exists()
+        :param remote:
+        :return:
+        """
+        try:
+            remote = OssFileManager.norm_path(remote)
+            return self.__bucket.object_exists(remote)
+        except Exception as e:
+            raise e
+
+    def upload(self, local, remote, recursive=False, on_success=None, on_error=None, progress_callback=None, *args, **kwargs):
+        """
+        upload a file
+        :param local:
+        :param remote:
+        :param progress_callback:
+        :return: class:`PutObjectResult <oss2.models.PutObjectResult>`
+        """
+        # TODO: resumable support
+        # TODO: multipart support
+        try:
+            local = os.path.abspath(local)
+            remote = OssFileManager.norm_path(remote)
+            if os.path.isdir(local):
+                if OssFileManager.is_dir(remote):
+                    dest_remote = remote + '/' + os.path.split(local)[-1] + '/'
+                else:
+                    raise Exception("remote path should be a directory")
+                md5 = OssFileManager.LOCAL_DIR_CONTENT_MD5
+                md5_b64 = OssFileManager.md5_to_base64(md5)
+                result = self.__bucket.put_object(dest_remote, OssFileManager.LOCAL_DIR_CONTENT,
+                                                  headers={OssFileManager.MD5_HEADER_STRING: md5_b64},
+                                                  progress_callback=progress_callback)
+                if recursive:
+                    for subdir in os.listdir(local):
+                        self.upload(os.path.join(local, subdir), dest_remote)
+            else:
+                if OssFileManager.is_dir(remote):
+                    dest_remote = remote + '/' + os.path.split(local)[-1]
+                else:
+                    dest_remote = remote
+                md5 = utils.file_md5(local)
+                md5_b64 = OssFileManager.md5_to_base64(md5)
+                result = self.__bucket.put_object_from_file(dest_remote, local,
+                                                            headers={OssFileManager.MD5_HEADER_STRING: md5_b64},
+                                                            progress_callback=progress_callback)
+            print("object put | \"" + local + "\" --> \"" + remote + "\"")
+            return result
+        except Exception as e:
+            raise e
+
+    def download(self, remote, local, recursive=False, on_success=None, on_error=None, progress_callback=None, *args, **kwargs):
+        """
+        download a file
+        :param remote:
+        :param local:
+        :param progress_callback:
+        :return:
+        """
+        # TODO: resumable support
+        # TODO: multipart support
+        try:
+            remote = OssFileManager.norm_path(remote)
+            local = path.abspath(local)
+            result = self.__bucket.get_object_to_file(remote, local,
+                                                      progress_callback=progress_callback)
+            print("object got | \"" + remote + "\" --> \"" + local + "\"")
+            return result
+        except Exception as e:
+            raise e
+
+    def delete(self, remote, recursive=False, on_success=None, on_error=None, *args, **kwargs):
+        """
+        delete a file
+        :param remote:
+        :return: class:`RequestResult <oss2.models.RequestResult>`
+        """
+        try:
+            remote = OssFileManager.norm_path(remote)
+            result = self.__bucket.delete_object(remote)
+            print("object deleted | \"" + remote + "\"")
+            return result
+        except Exception as e:
+            raise e
+
+    def rename(self, remote_old, remote_new, on_success=None, on_error=None, *args, **kwargs):
+        """
+        rename a file using Bucket.copy_object() first then delete the original
+        :param remote_old:
+        :param remote_new:
+        :return:
+        """
+        try:
+            remote_old = OssFileManager.norm_path(remote_old)
+            remote_new = OssFileManager.norm_path(remote_new)
+            self.__bucket.copy_object(self.__bucket.bucket_name, remote_old, remote_new)
+            self.delete(remote_old)
+            print("object renamed | \"" + remote_old + "\" --> \"" + remote_new + "\"")
+        except Exception as e:
+            raise e
+
+    def get_iterator(self, root='', delimiter='', *args, **kwargs):
+        """
+        return object iterator with specified prefix and/or delimiter
+        :param root:
+        :param delimiter:
+        :return:
+        """
+        try:
+            return oss2.ObjectIterator(self.__bucket, root, delimiter)
+        except Exception as e:
+            raise e
+
+    @staticmethod
+    def norm_path(remote_path):
+        """
+        normalize remote path
+        e.g. foo/bar/ --directory
+        e.g. foo/bar/foobar.txt --file
+        :param remote_path:
+        :return:
+        """
+        isdir = True if remote_path.endswith(('\\', '/')) else False
+        remote_path = os.path.normpath(remote_path).replace('\\', '/')
+        if isdir:
+            remote_path += '/'
+        return remote_path
+
+    @staticmethod
+    def is_dir(remote_path):
+        """
+        judge if a remote_path is a dir by if it ends with '/'
+        :param remote_path:
+        :return:
+        """
+        return OssFileManager.norm_path(remote_path).endswith('/')
+
+    @staticmethod
+    def md5_to_base64(md5_str):
+        return base64.b64encode(binascii.a2b_hex(md5_str.encode())).decode()
+
+    @staticmethod
+    def base64_to_md5(b64):
+        return binascii.b2a_hex(base64.b64decode(b64.encode())).decode()
