@@ -7,7 +7,6 @@ import oss2
 import os
 import binascii
 import base64
-import re
 
 
 class OssFileManager:
@@ -23,6 +22,8 @@ class OssFileManager:
 
     MD5_HEADER_STRING = 'Content-MD5'
 
+    SEP = '/'
+
     def __init__(self, auth_key, auth_key_secret, endpoint, bucket_name):
         auth = oss2.Auth(auth_key, auth_key_secret)
         self.__bucket = oss2.Bucket(auth, endpoint, bucket_name, enable_crc=False)
@@ -35,10 +36,10 @@ class OssFileManager:
         :return: md5 string
         """
         try:
-            remote = OssFileManager.norm_path(remote)
+            remote = self.norm_path(remote)
             head = self.__bucket.head_object(remote)
-            if OssFileManager.MD5_HEADER_STRING in head.headers:
-                return OssFileManager.base64_to_md5(head.headers[OssFileManager.MD5_HEADER_STRING])
+            if self.MD5_HEADER_STRING in head.headers:
+                return self.base64_to_md5(head.headers[self.MD5_HEADER_STRING])
             else:
                 return head.etag
         except Exception as e:
@@ -51,7 +52,7 @@ class OssFileManager:
         :return: boolean
         """
         try:
-            remote = OssFileManager.norm_path(remote)
+            remote = self.norm_path(remote)
             return self.__bucket.object_exists(remote)
         except Exception as e:
             raise YuiException(e)
@@ -74,16 +75,16 @@ class OssFileManager:
         # TODO: multipart support
         try:
             local = os.path.abspath(local)
-            remote = OssFileManager.norm_path(remote)
+            remote = self.norm_path(remote)
             if os.path.isdir(local):
-                if OssFileManager.is_dir(remote):
-                    dest_remote = remote + os.path.split(local)[-1] + '/'
+                if self.is_dir(remote):
+                    dest_remote = remote + os.path.split(local)[-1] + self.SEP
                 else:
-                    raise Exception("remote path should be a directory")
-                md5 = OssFileManager.LOCAL_DIR_CONTENT_MD5
-                md5_b64 = OssFileManager.md5_to_base64(md5)
-                result = self.__bucket.put_object(dest_remote, OssFileManager.LOCAL_DIR_CONTENT,
-                                                  headers={OssFileManager.MD5_HEADER_STRING: md5_b64},
+                    raise YuiUploadException("remote path should be a directory")
+                md5 = self.LOCAL_DIR_CONTENT_MD5
+                md5_b64 = self.md5_to_base64(md5)
+                result = self.__bucket.put_object(dest_remote, self.LOCAL_DIR_CONTENT,
+                                                  headers={self.MD5_HEADER_STRING: md5_b64},
                                                   progress_callback=progress_callback)
                 if recursive:
                     for subdir in os.listdir(local):
@@ -91,19 +92,21 @@ class OssFileManager:
                                     on_success=on_success, on_error=on_error,
                                     recursive=True, progress_callback=progress_callback)
             else:
-                if OssFileManager.is_dir(remote):
+                if self.is_dir(remote):
                     dest_remote = remote + os.path.split(local)[-1]
                 else:
                     dest_remote = remote
                 md5 = utils.file_md5(local)
-                md5_b64 = OssFileManager.md5_to_base64(md5)
+                md5_b64 = self.md5_to_base64(md5)
                 result = self.__bucket.put_object_from_file(dest_remote, local,
-                                                            headers={OssFileManager.MD5_HEADER_STRING: md5_b64},
+                                                            headers={self.MD5_HEADER_STRING: md5_b64},
                                                             progress_callback=progress_callback)
 
-            print("object put | \"" + local + "\" --> \"" + remote + "\"")
-            on_error(local, remote, result) if on_error and result.status >= 400 \
-                else on_success(local, remote, result) if on_success else None
+            if result.status >= 400:
+                on_error(local, remote, result) if on_error else None
+            else:
+                print("object put | \"" + local + "\" --> \"" + remote + "\"")
+                on_success(local, remote, result) if on_success else None
             return result
         except Exception as e:
             raise YuiUploadException(e)
@@ -122,14 +125,37 @@ class OssFileManager:
         # TODO: resumable support
         # TODO: multipart support
         try:
-            remote = OssFileManager.norm_path(remote)
-            local = path.abspath(local)
-            result = self.__bucket.get_object_to_file(remote, local,
-                                                      progress_callback=progress_callback)
-            print("object got | \"" + remote + "\" --> \"" + local + "\"")
+            local = os.path.abspath(local)
+            remote = self.norm_path(remote)
+            if self.is_dir(remote):
+                if os.path.isdir(local):
+                    dest_local = local + os.sep + remote.split(self.SEP)[-2] + os.sep
+                else:
+                    raise YuiDownloadException("local path should be a directory")
+                os.mkdir(dest_local)
+                result = "mkdir"
+
+                if recursive:
+                    for subdir in self.list_dir(remote):
+                        self.download(remote + subdir, dest_local,
+                                      on_success=on_success, on_error=on_error,
+                                      recursive=True, progress_callback=progress_callback)
+            else:
+                if os.path.isdir(local):
+                    dest_local = local + os.sep + remote.split(self.SEP)[-2] + os.sep
+                else:
+                    dest_local = local
+                result = self.__bucket.get_object_to_file(remote, dest_local,
+                                                          progress_callback=progress_callback)
+
+            if result != "mkdir" and result.status >= 400:
+                on_error(local, remote, result) if on_error else None
+            else:
+                print("object got | \"" + remote + "\" --> \"" + local + "\"")
+                on_success(local, remote, result) if on_success else None
             return result
         except Exception as e:
-            raise e
+            raise YuiDownloadException(e)
 
     def delete(self, remote, recursive=False, on_success=None, on_error=None):
         """
@@ -141,14 +167,26 @@ class OssFileManager:
         :return: class:`RequestResult <oss2.models.RequestResult>`
         """
         try:
-            remote = OssFileManager.norm_path(remote)
+            remote = self.norm_path(remote)
+            if self.is_dir(remote):
+                if recursive:
+                    for subdir in self.list_dir(remote):
+                        self.delete(remote + subdir,
+                                    on_success=on_success, on_error=on_error,
+                                    recursive=True)
+
             result = self.__bucket.delete_object(remote)
-            print("object deleted | \"" + remote + "\"")
+
+            if result.status >= 400:
+                on_error(remote, result) if on_error else None
+            else:
+                print("object deleted | \"" + remote + "\"")
+                on_success(remote, result) if on_success else None
             return result
         except Exception as e:
-            raise e
+            raise YuiDeleteException(e)
 
-    def rename(self, remote_old, remote_new, on_success=None, on_error=None):
+    def move(self, remote_old, remote_new, on_success=None, on_error=None):
         """
         rename a file using Bucket.copy_object() first then delete the original
         :param remote_old:
@@ -158,15 +196,22 @@ class OssFileManager:
         :return:
         """
         try:
-            remote_old = OssFileManager.norm_path(remote_old)
-            remote_new = OssFileManager.norm_path(remote_new)
-            self.__bucket.copy_object(self.__bucket.bucket_name, remote_old, remote_new)
-            self.delete(remote_old)
-            print("object renamed | \"" + remote_old + "\" --> \"" + remote_new + "\"")
+            remote_old = self.norm_path(remote_old)
+            remote_new = self.norm_path(remote_new)
+            result = self.__bucket.copy_object(self.__bucket.bucket_name, remote_old, remote_new)
+            if result.status >= 400:
+                on_error(remote_old, remote_new, result) if on_error else None
+            else:
+                result = self.delete(remote_old)
+                if result.status >= 400:
+                    on_error(remote_old, remote_new, result) if on_error else None
+                else:
+                    print("object renamed | \"" + remote_old + "\" --> \"" + remote_new + "\"")
+                    on_success(remote_old, remote_new, result) if on_success else None
         except Exception as e:
-            raise e
+            raise YuiMoveException(e)
 
-    def get_iterator(self, root='', delimiter=''):
+    def list_dir(self, root='', delimiter=''):
         """
         return object iterator with specified prefix and/or delimiter
         :param root:
@@ -176,7 +221,7 @@ class OssFileManager:
         try:
             return oss2.ObjectIterator(self.__bucket, root, delimiter)
         except Exception as e:
-            raise e
+            raise YuiListDirException(e)
 
     @staticmethod
     def norm_path(remote_path):

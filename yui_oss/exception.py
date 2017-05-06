@@ -20,20 +20,27 @@ class YuiUploadException(YuiException):
 
 class YuiDownloadException(YuiException):
     """
-    raised when error occurred while uploading files
+    raised when error occurred while downloading files
     """
     pass
 
 
 class YuiDeleteException(YuiException):
     """
-    raised when error occurred while uploading files
+    raised when error occurred while deleting files
     """
     pass
 
 
 class YuiMoveException(YuiException):
     """
-    raised when error occurred while uploading files
+    raised when error occurred while moving/renaming files
+    """
+    pass
+
+
+class YuiListDirException(YuiException):
+    """
+    raised when error occurred while listing files
     """
     pass
