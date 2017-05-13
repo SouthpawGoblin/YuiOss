@@ -69,20 +69,19 @@ class OssFileManager:
         :param on_success: success callback
         :param on_error: error callback
         :param progress_callback:
-        :return: class:`PutObjectResult <oss2.models.PutObjectResult>`
+        :return:
         """
         # TODO: resumable support
         # TODO: multipart support
         try:
             local = os.path.abspath(local)
             remote = self.norm_path(remote)
+            dest_remote = remote + os.path.split(local)[-1] if self.is_dir(remote) else remote
+            dest_remote += self.SEP if os.path.isdir(local) else ''
             if os.path.isdir(local):
-                if self.is_dir(remote):
-                    dest_remote = remote + os.path.split(local)[-1] + self.SEP
-                else:
+                if not self.is_dir(dest_remote):
                     raise YuiUploadException("remote path should be a directory")
-                md5 = self.LOCAL_DIR_CONTENT_MD5
-                md5_b64 = self.md5_to_base64(md5)
+                md5_b64 = self.md5_to_base64(self.LOCAL_DIR_CONTENT_MD5)
                 result = self.__bucket.put_object(dest_remote, self.LOCAL_DIR_CONTENT,
                                                   headers={self.MD5_HEADER_STRING: md5_b64},
                                                   progress_callback=progress_callback)
@@ -92,22 +91,15 @@ class OssFileManager:
                                     on_success=on_success, on_error=on_error,
                                     recursive=True, progress_callback=progress_callback)
             else:
-                if self.is_dir(remote):
-                    dest_remote = remote + os.path.split(local)[-1]
-                else:
-                    dest_remote = remote
-                md5 = utils.file_md5(local)
-                md5_b64 = self.md5_to_base64(md5)
+                md5_b64 = self.md5_to_base64(utils.file_md5(local))
                 result = self.__bucket.put_object_from_file(dest_remote, local,
                                                             headers={self.MD5_HEADER_STRING: md5_b64},
                                                             progress_callback=progress_callback)
-
             if result.status >= 400:
                 on_error(local, remote, result) if on_error else None
             else:
                 print("object put | \"" + local + "\" --> \"" + remote + "\"")
                 on_success(local, remote, result) if on_success else None
-            return result
         except Exception as e:
             raise YuiUploadException(e)
 
@@ -124,36 +116,33 @@ class OssFileManager:
         """
         # TODO: resumable support
         # TODO: multipart support
+        def download_single(rem, loc):
+            dest_loc = loc + os.sep + rem.strip(self.SEP).split(self.SEP)[-1] if os.path.isdir(loc) else loc
+            dest_loc += os.sep if self.is_dir(rem) else ''
+            if self.is_dir(rem):
+                os.mkdir(dest_loc)
+                res = "mkdir"
+            else:
+                res = self.__bucket.get_object_to_file(rem, dest_loc,
+                                                       progress_callback=progress_callback)
+            if res != "mkdir" and res.status >= 400:
+                on_error(loc, rem, res) if on_error else None
+            else:
+                print("object got | \"" + rem + "\" --> \"" + loc + "\"")
+                on_success(loc, rem, res) if on_success else None
+
         try:
             local = os.path.abspath(local)
             remote = self.norm_path(remote)
-            if self.is_dir(remote):
-                if os.path.isdir(local):
-                    dest_local = local + os.sep + remote.split(self.SEP)[-2] + os.sep
-                else:
-                    raise YuiDownloadException("local path should be a directory")
-                os.mkdir(dest_local)
-                result = "mkdir"
+            download_single(remote, local)
 
-                if recursive:
-                    for subdir in self.list_dir(remote):
-                        self.download(remote + subdir, dest_local,
-                                      on_success=on_success, on_error=on_error,
-                                      recursive=True, progress_callback=progress_callback)
-            else:
-                if os.path.isdir(local):
-                    dest_local = local + os.sep + remote.split(self.SEP)[-2] + os.sep
-                else:
-                    dest_local = local
-                result = self.__bucket.get_object_to_file(remote, dest_local,
-                                                          progress_callback=progress_callback)
+            if self.is_dir(remote) and recursive:
+                print([a.key for a in self.list_dir(remote, True)])
+                for subdir in self.list_dir(remote, True):
+                    postfix = self.SEP.join(subdir.key.strip(self.SEP).split(self.SEP)[:-1])
+                    dest_local = os.path.normpath(self.SEP.join([local, postfix]))
+                    download_single(subdir.key, dest_local)
 
-            if result != "mkdir" and result.status >= 400:
-                on_error(local, remote, result) if on_error else None
-            else:
-                print("object got | \"" + remote + "\" --> \"" + local + "\"")
-                on_success(local, remote, result) if on_success else None
-            return result
         except Exception as e:
             raise YuiDownloadException(e)
 
@@ -171,9 +160,10 @@ class OssFileManager:
             if self.is_dir(remote):
                 if recursive:
                     for subdir in self.list_dir(remote):
-                        self.delete(remote + subdir,
-                                    on_success=on_success, on_error=on_error,
-                                    recursive=True)
+                        if subdir.key != remote:
+                            self.delete(subdir.key,
+                                        on_success=on_success, on_error=on_error,
+                                        recursive=True)
 
             result = self.__bucket.delete_object(remote)
 
@@ -211,15 +201,15 @@ class OssFileManager:
         except Exception as e:
             raise YuiMoveException(e)
 
-    def list_dir(self, root='', delimiter=''):
+    def list_dir(self, root, list_all=False):
         """
         return object iterator with specified prefix and/or delimiter
         :param root:
-        :param delimiter:
+        :param list_all: if is True, all subdirectories and files will be returned, else only children directories and files
         :return:
         """
         try:
-            return oss2.ObjectIterator(self.__bucket, root, delimiter)
+            return oss2.ObjectIterator(self.__bucket, root, '' if list_all else self.SEP)
         except Exception as e:
             raise YuiListDirException(e)
 
@@ -232,10 +222,10 @@ class OssFileManager:
         :param remote_path:
         :return:
         """
-        isdir = True if remote_path.endswith(('\\', '/')) else False
-        remote_path = os.path.normpath(remote_path).replace('\\', '/')
+        isdir = True if remote_path.endswith((os.sep, OssFileManager.SEP)) else False
+        remote_path = os.path.normpath(remote_path).replace(os.sep, OssFileManager.SEP)
         if isdir:
-            remote_path += '/'
+            remote_path += OssFileManager.SEP
         return remote_path
 
     @staticmethod
@@ -245,7 +235,7 @@ class OssFileManager:
         :param remote_path:
         :return:
         """
-        return OssFileManager.norm_path(remote_path).endswith('/')
+        return OssFileManager.norm_path(remote_path).endswith(OssFileManager.SEP)
 
     @staticmethod
     def md5_to_base64(md5_str):
