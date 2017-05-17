@@ -36,15 +36,38 @@ class OssFileManagerTest(unittest.TestCase):
         with open(self._dir_ch + self._file_ch, 'w') as file_ch:
             file_ch.write(self._file_content_ch)
 
-    def test_upload(self):# TODO: 采用回调来测试，不使用返回值
-        res = self.fm.upload(self._root,
-                             self.fm.norm_path('YuiOss_test/'), recursive=True)
-        self.assertLessEqual(1, 1, "test_upload failed")
+    def test_upload(self):
+        self.cnt = 0
+
+        def on_success(loc, rem, res):
+            self.cnt += 1
+
+        self.fm.upload(self._root,
+                       self.fm.norm_path('YuiOss_test/'), recursive=True,
+                       on_success=on_success)
+        self.assertEqual(self.cnt, 8, "test_upload failed")
 
     def test_download(self):
-        res = self.fm.download(self.fm.norm_path('YuiOss_test/'),
-                               self._dir_download, recursive=True)
-        self.assertTrue(res == "mkdir" or res.status < 400, "test_download failed")
+        self.cnt = 0
+
+        def on_success(loc, rem, res):
+            self.cnt += 1
+
+        self.fm.download(self.fm.norm_path('YuiOss_test/'),
+                         self._dir_download, recursive=True,
+                         on_success=on_success)
+        self.assertGreaterEqual(self.cnt, 9, "test_download failed")
+
+    def test_delete(self):
+        self.cnt = 0
+
+        def on_success(rem, res):
+            self.cnt += 1
+
+        self.fm.delete(self.fm.norm_path('YuiOss_test/test-root/'), recursive=True,
+                       on_success=on_success)
+
+        self.assertEqual(len(list(self.fm.list_dir('YuiOss_test/', True))), 0, 'test_delete failed')
 
     def tearDown(self):
         self.fm = None
@@ -54,5 +77,6 @@ if __name__ == "__main__":
     suite = unittest.TestSuite()
     suite.addTest(OssFileManagerTest("test_upload"))
     suite.addTest(OssFileManagerTest("test_download"))
+    suite.addTest(OssFileManagerTest("test_delete"))
     runner = unittest.TextTestRunner()
     runner.run(suite)

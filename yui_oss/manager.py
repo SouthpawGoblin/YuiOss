@@ -137,7 +137,6 @@ class OssFileManager:
             download_single(remote, local)
 
             if self.is_dir(remote) and recursive:
-                print([a.key for a in self.list_dir(remote, True)])
                 for subdir in self.list_dir(remote, True):
                     postfix = self.SEP.join(subdir.key.strip(self.SEP).split(self.SEP)[:-1])
                     dest_local = os.path.normpath(self.SEP.join([local, postfix]))
@@ -155,24 +154,25 @@ class OssFileManager:
         :param on_error:
         :return: class:`RequestResult <oss2.models.RequestResult>`
         """
+        def delete_single(rem):
+            result = self.__bucket.delete_object(rem)
+            if result.status >= 400:
+                on_error(rem, result) if on_error else None
+            else:
+                print("object deleted | \"" + rem + "\"")
+                on_success(rem, result) if on_success else None
         try:
             remote = self.norm_path(remote)
             if self.is_dir(remote):
                 if recursive:
-                    for subdir in self.list_dir(remote):
-                        if subdir.key != remote:
-                            self.delete(subdir.key,
-                                        on_success=on_success, on_error=on_error,
-                                        recursive=True)
-
-            result = self.__bucket.delete_object(remote)
-
-            if result.status >= 400:
-                on_error(remote, result) if on_error else None
+                    subdirs = list(self.list_dir(remote, True))
+                    subdirs.reverse()
+                    for subdir in subdirs:
+                        delete_single(subdir.key)
+                else:
+                    raise YuiDeleteException("The directory to be deleted is not empty!")
             else:
-                print("object deleted | \"" + remote + "\"")
-                on_success(remote, result) if on_success else None
-            return result
+                delete_single(remote)
         except Exception as e:
             raise YuiDeleteException(e)
 
