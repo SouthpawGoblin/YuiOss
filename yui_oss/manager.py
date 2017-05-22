@@ -185,19 +185,32 @@ class OssFileManager:
         :param on_error:
         :return:
         """
+        def move_single(rem_old, rem_new):
+            res = self.__bucket.copy_object(self.__bucket.bucket_name, rem_old, rem_new)
+            if res.status >= 400:
+                on_error(rem_old, rem_new, res) if on_error else None
+            res = self.__bucket.delete_object(rem_old)
+            if res.status >= 400:
+                on_error(rem_old, rem_new, res) if on_error else None
+            else:
+                print("object moved | \"" + rem_old + "\" --> \"" + rem_new + "\"")
+                on_success(rem_old, rem_new, res) if on_success else None
         try:
             remote_old = self.norm_path(remote_old)
             remote_new = self.norm_path(remote_new)
-            result = self.__bucket.copy_object(self.__bucket.bucket_name, remote_old, remote_new)
-            if result.status >= 400:
-                on_error(remote_old, remote_new, result) if on_error else None
+            if self.is_dir(remote_old):
+                if not self.is_dir(remote_new):
+                    raise YuiMoveException("destination path should also be a directory")
+                prefix = self.SEP.join(remote_old.strip(self.SEP).split(self.SEP)[:-1]) + self.SEP
+                for subdir in self.list_dir(remote_old, True):
+                    new_path = subdir.key.replace(prefix, remote_new)
+                    move_single(subdir.key, new_path)
             else:
-                result = self.delete(remote_old)
-                if result.status >= 400:
-                    on_error(remote_old, remote_new, result) if on_error else None
-                else:
-                    print("object renamed | \"" + remote_old + "\" --> \"" + remote_new + "\"")
-                    on_success(remote_old, remote_new, result) if on_success else None
+                if self.is_dir(remote_new):
+                    prefix = self.SEP.join(remote_old.strip(self.SEP).split(self.SEP)[:-1]) + self.SEP
+                    remote_new = remote_old.replace(prefix, remote_new)
+                move_single(remote_old, remote_new)
+
         except Exception as e:
             raise YuiMoveException(e)
 

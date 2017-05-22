@@ -47,6 +47,17 @@ class OssFileManagerTest(unittest.TestCase):
                        on_success=on_success)
         self.assertEqual(self.cnt, 8, "test_upload failed")
 
+    def test_move(self):
+        self.cnt = 0
+
+        def on_success(loc, rem, res):
+            self.cnt += 1
+
+        self.fm.move(self._root,
+                     'YuiOss_test_move/',
+                     on_success=on_success)
+        self.assertEqual(self.cnt, 8, "test_upload failed")
+
     def test_download(self):
         self.cnt = 0
 
@@ -76,6 +87,7 @@ class OssFileManagerTest(unittest.TestCase):
 if __name__ == "__main__":
     suite = unittest.TestSuite()
     suite.addTest(OssFileManagerTest("test_upload"))
+    suite.addTest(OssFileManagerTest("test_move"))
     suite.addTest(OssFileManagerTest("test_download"))
     suite.addTest(OssFileManagerTest("test_delete"))
     runner = unittest.TextTestRunner()
