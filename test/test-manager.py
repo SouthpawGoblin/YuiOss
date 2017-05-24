@@ -22,6 +22,7 @@ class OssFileManagerTest(unittest.TestCase):
         self._file_en = "test_" + self._timestamp + "_Tachikoma.txt"
         self._file_ch = "test_" + self._timestamp + "_塔奇克玛.txt"
 
+        # prepare test files
         shutil.rmtree(self._root, True)
         os.mkdir(self._root)
         os.mkdir(self._dir_download)
@@ -39,48 +40,49 @@ class OssFileManagerTest(unittest.TestCase):
     def test_upload(self):
         self.cnt = 0
 
-        def on_success(loc, rem, res):
+        def on_error(loc, rem, res):
             self.cnt += 1
 
         self.fm.upload(self._root,
                        self.fm.norm_path('YuiOss_test/'), recursive=True,
-                       on_success=on_success)
-        self.assertEqual(self.cnt, 8, "test_upload failed")
+                       on_error=on_error)
+        self.assertEqual(self.cnt, 0, "test_upload failed")
 
     def test_move(self):
         self.cnt = 0
 
-        def on_success(loc, rem, res):
+        def on_error(loc, rem, res):
             self.cnt += 1
 
         self.fm.move(self._root,
                      'YuiOss_test_move/',
-                     on_success=on_success)
-        self.assertEqual(self.cnt, 8, "test_upload failed")
+                     on_error=on_error)
+        self.assertEqual(self.cnt, 0, "test_upload failed")
 
     def test_download(self):
         self.cnt = 0
 
-        def on_success(loc, rem, res):
+        def on_error(loc, rem, res):
             self.cnt += 1
 
         self.fm.download(self.fm.norm_path('YuiOss_test/'),
                          self._dir_download, recursive=True,
-                         on_success=on_success)
-        self.assertGreaterEqual(self.cnt, 9, "test_download failed")
+                         on_error=on_error)
+        self.assertGreaterEqual(self.cnt, 0, "test_download failed")
 
     def test_delete(self):
         self.cnt = 0
 
-        def on_success(rem, res):
+        def on_error(rem, res):
             self.cnt += 1
 
         self.fm.delete(self.fm.norm_path('YuiOss_test/test-root/'), recursive=True,
-                       on_success=on_success)
+                       on_error=on_error)
 
         self.assertEqual(len(list(self.fm.list_dir('YuiOss_test/', True))), 0, 'test_delete failed')
 
     def tearDown(self):
+        self.fm.delete(self.fm.norm_path('YuiOss_test_move/'), recursive=True)
         self.fm = None
 
 
