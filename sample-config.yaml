@@ -1,0 +1,12 @@
+# oss configurations
+
+auth_key:
+auth_key_secret:
+endpoint:
+bucket_name:
+
+proxies:
+#  http: http://user:pass@example.yuioss.com:8080
+#  https: http://user:pass@example.yuioss.com:8080
+  http:
+  https:

@@ -24,9 +24,9 @@ class OssFileManager:
 
     SEP = '/'
 
-    def __init__(self, auth_key, auth_key_secret, endpoint, bucket_name):
+    def __init__(self, auth_key, auth_key_secret, endpoint, bucket_name, proxies=None):
         auth = oss2.Auth(auth_key, auth_key_secret)
-        self.__bucket = oss2.Bucket(auth, endpoint, bucket_name, enable_crc=False)
+        self.__bucket = oss2.Bucket(auth, endpoint, bucket_name, enable_crc=False, proxies=proxies)
 
     def get_md5(self, remote):
         """
