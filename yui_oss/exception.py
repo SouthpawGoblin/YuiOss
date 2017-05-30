@@ -44,3 +44,10 @@ class YuiListDirException(YuiException):
     raised when error occurred while listing files
     """
     pass
+
+
+class YuiConsoleException(YuiException):
+    """
+    raised when error occurred while using console application commands
+    """
+    pass

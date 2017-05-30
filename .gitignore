@@ -1,5 +1,6 @@
 # Created by .ignore support plugin (hsz.mobi)
-/config.yaml
+.yui
+config.yaml
 /.idea
 yui_oss/__pycache__/
 test/temp/

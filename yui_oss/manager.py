@@ -9,6 +9,9 @@ import binascii
 import base64
 
 
+VERSION = '0.0.1'
+
+
 class OssFileManager:
     """
     class for managing oss files
