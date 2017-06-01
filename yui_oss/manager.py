@@ -99,10 +99,10 @@ class OssFileManager:
                                                             headers={self.MD5_HEADER_STRING: md5_b64},
                                                             progress_callback=progress_callback)
             if result.status >= 400:
-                on_error(local, remote, result) if on_error else None
+                on_error("upload", local, remote, result) if on_error else None
             else:
-                print("object put | \"" + local + "\" --> \"" + remote + "\"")
-                on_success(local, remote, result) if on_success else None
+                # print("object put | \"" + local + "\" --> \"" + remote + "\"")
+                on_success("upload", local, remote, result) if on_success else None
         except Exception as e:
             raise YuiUploadException(e)
 
@@ -129,10 +129,10 @@ class OssFileManager:
                 res = self.__bucket.get_object_to_file(rem, dest_loc,
                                                        progress_callback=progress_callback)
             if res != "mkdir" and res.status >= 400:
-                on_error(loc, rem, res) if on_error else None
+                on_error("download", loc, rem, res) if on_error else None
             else:
-                print("object got | \"" + rem + "\" --> \"" + loc + "\"")
-                on_success(loc, rem, res) if on_success else None
+                # print("object got | \"" + rem + "\" --> \"" + loc + "\"")
+                on_success("download", loc, rem, res) if on_success else None
 
         try:
             local = os.path.abspath(local)
@@ -160,10 +160,10 @@ class OssFileManager:
         def delete_single(rem):
             result = self.__bucket.delete_object(rem)
             if result.status >= 400:
-                on_error(rem, result) if on_error else None
+                on_error("delete", rem, None, result) if on_error else None
             else:
-                print("object deleted | \"" + rem + "\"")
-                on_success(rem, result) if on_success else None
+                # print("object deleted | \"" + rem + "\"")
+                on_success("delete", rem, None, result) if on_success else None
         try:
             remote = self.norm_path(remote)
             if self.is_dir(remote):
@@ -194,10 +194,10 @@ class OssFileManager:
                 on_error(rem_old, rem_new, res) if on_error else None
             res = self.__bucket.delete_object(rem_old)
             if res.status >= 400:
-                on_error(rem_old, rem_new, res) if on_error else None
+                on_error("move", rem_old, rem_new, res) if on_error else None
             else:
-                print("object moved | \"" + rem_old + "\" --> \"" + rem_new + "\"")
-                on_success(rem_old, rem_new, res) if on_success else None
+                # print("object moved | \"" + rem_old + "\" --> \"" + rem_new + "\"")
+                on_success("move", rem_old, rem_new, res) if on_success else None
         try:
             remote_old = self.norm_path(remote_old)
             remote_new = self.norm_path(remote_new)

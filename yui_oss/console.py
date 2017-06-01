@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+from colorama import init, Fore
 from argparse import ArgumentParser
 from .manager import OssFileManager, VERSION
 from .exception import *
@@ -32,13 +33,15 @@ class Yui:
                 self.root = ""
 
         self.args = None
-        self.methods = ("cd", "ls")
+        self.methods = ("cd", "ls", "ul")
 
         self.parser = ArgumentParser(description="YuiOss console application ver " + VERSION)
         self.parser.add_argument("-a", "--all", action="store_true")
         self.parser.add_argument("-r", "--recursive", action="store_true")
         self.parser.add_argument("method", choices=self.methods, nargs=1)
         self.parser.add_argument("args", nargs=argparse.ZERO_OR_MORE)
+
+        init()
 
     def run(self):
         self.args = self.parser.parse_args()
@@ -49,6 +52,16 @@ class Yui:
     def update_attr(self):
         with open(self.ATTR_FILE, 'w+') as f:
             yaml.dump(self.attrs, f)
+
+    @staticmethod
+    def on_success(method, src, dest, result):
+        print(Fore.GREEN + str(method) + " success: " +
+              src + ("" if not dest else " --> " + dest))
+
+    @staticmethod
+    def on_error(method, src, dest, result):
+        print(Fore.RED + str(method) + " success: " +
+              src + ("" if not dest else " --> " + dest))
 
     def cd(self):
         """
@@ -61,12 +74,12 @@ class Yui:
         else:
             path = self.args.args[0]
             if not self.fm.is_dir(path):
-                raise YuiConsoleException("cd path should be a directory")
+                print(Fore.RED + "cd path should be a directory")
             path = self.fm.norm_path(path)
             self.root = path[1:] if path.startswith(self.fm.SEP) else self.root + path
         self.attrs["root"] = self.root
         self.update_attr()
-        print("current directory changed to: /" + self.root)
+        print(Fore.GREEN + "current directory changed to: /" + self.root)
 
     def ls(self):
         """
@@ -74,7 +87,23 @@ class Yui:
         :return:
         """
         files = [obj.key for obj in self.fm.list_dir(self.root, self.args.all)]
-        print("listing: /" + self.root + '\n' + '\t'.join(files) if len(files)
-              else "current directory: /" + self.root + " is empty.")
+        print((Fore.GREEN + "listing: /" + self.root + '\n' + '\t'.join(files)) if len(files)
+              else (Fore.YELLOW + "current directory: /" + self.root + " is empty."))
 
+    def ul(self):
+        """
+        upload
+        :return:
+        """
+        if len(self.args.args) != 2:
+            print(Fore.RED + "'ul' needs 2 input arguments: src, dest")
+        src = self.args.args[0]
+        dest = self.args.args[1][1:] if self.args.args[1].startswith(self.fm.SEP) else self.root + self.args.args[1]
+        try:
+            self.fm.upload(src, dest,
+                           recursive=self.args.recursive,
+                           on_success=self.on_success, on_error=self.on_error)
+        except YuiException as e:
+            print(Fore.RED + "'ul' encountered an error: \n" +
+                  str(e))
 
