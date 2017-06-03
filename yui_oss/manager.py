@@ -238,8 +238,11 @@ class OssFileManager:
         :param remote_path:
         :return:
         """
+        remote_path = remote_path.strip()
+        if remote_path == '' or remote_path == OssFileManager.SEP:
+            return remote_path
         isdir = True if remote_path.endswith((os.sep, OssFileManager.SEP)) else False
-        remote_path = os.path.normpath(remote_path).replace(os.sep, OssFileManager.SEP)
+        remote_path = os.path.normpath(remote_path).replace(os.sep, OssFileManager.SEP).replace('.', '')
         if isdir:
             remote_path += OssFileManager.SEP
         return remote_path
@@ -251,7 +254,8 @@ class OssFileManager:
         :param remote_path:
         :return:
         """
-        return OssFileManager.norm_path(remote_path).endswith(OssFileManager.SEP)
+        return True if remote_path.strip() == '' \
+            else OssFileManager.norm_path(remote_path).endswith(OssFileManager.SEP)
 
     @staticmethod
     def md5_to_base64(md5_str):
