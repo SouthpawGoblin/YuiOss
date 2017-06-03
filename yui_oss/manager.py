@@ -179,6 +179,44 @@ class OssFileManager:
         except Exception as e:
             raise YuiDeleteException(e)
 
+    def copy(self, remote_src, remote_dest, on_success=None, on_error=None):
+        """
+        copy remote files using Bucket.copy_object()
+        :param remote_src:
+        :param remote_dest:
+        :param on_success:
+        :param on_error:
+        :return:
+        """
+        def copy_single(rem_src, rem_dest):
+            res = self.__bucket.copy_object(self.__bucket.bucket_name, rem_src, rem_dest)
+            if res.status >= 400:
+                on_error(rem_src, rem_dest, res) if on_error else None
+            else:
+                # print("object moved | \"" + rem_src + "\" --> \"" + rem_dest + "\"")
+                on_success("copy", rem_src, rem_dest, res) if on_success else None
+
+        try:
+            remote_src = self.norm_path(remote_src)
+            remote_dest = self.norm_path(remote_dest)
+            if self.is_dir(remote_src):
+                if not self.is_dir(remote_dest):
+                    raise YuiMoveException("destination path should also be a directory")
+                if remote_dest.startswith(remote_src):
+                    raise YuiCopyException("destination directory is a sub-directory of the source directory")
+                prefix = self.SEP.join(remote_src.strip(self.SEP).split(self.SEP)[:-1]) + self.SEP
+                for subdir in self.list_dir(remote_src, True):
+                    new_path = subdir.key.replace(prefix, remote_dest)
+                    copy_single(subdir.key, new_path)
+            else:
+                if self.is_dir(remote_dest):
+                    prefix = self.SEP.join(remote_src.strip(self.SEP).split(self.SEP)[:-1]) + self.SEP
+                    remote_dest = remote_src.replace(prefix, remote_dest)
+                copy_single(remote_src, remote_dest)
+
+        except Exception as e:
+            raise YuiCopyException(e)
+
     def move(self, remote_old, remote_new, on_success=None, on_error=None):
         """
         rename a file using Bucket.copy_object() first then delete the original
@@ -204,6 +242,8 @@ class OssFileManager:
             if self.is_dir(remote_old):
                 if not self.is_dir(remote_new):
                     raise YuiMoveException("destination path should also be a directory")
+                if remote_new.startswith(remote_old):
+                    raise YuiMoveException("destination directory is a sub-directory of the source directory")
                 prefix = self.SEP.join(remote_old.strip(self.SEP).split(self.SEP)[:-1]) + self.SEP
                 for subdir in self.list_dir(remote_old, True):
                     new_path = subdir.key.replace(prefix, remote_new)

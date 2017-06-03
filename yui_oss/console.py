@@ -33,9 +33,12 @@ class Yui:
                 self.root = ""
 
         self.args = None
-        self.methods = ("cd", "ls", "ul")
+        self.methods = ("cd", "ls", "ul", "dl", "cp")
 
         self.parser = ArgumentParser(description="YuiOss console application ver " + VERSION)
+        self.parser.set_defaults(verbose=True)
+        self.parser.add_argument("-v", "--verbose", dest="verbose", action="store_true")
+        self.parser.add_argument("-q", "--quiet", dest="verbose", action="store_false")
         self.parser.add_argument("-a", "--all", action="store_true")
         self.parser.add_argument("-r", "--recursive", action="store_true")
         self.parser.add_argument("method", choices=self.methods, nargs=1)
@@ -53,13 +56,12 @@ class Yui:
         with open(self.ATTR_FILE, 'w+') as f:
             yaml.dump(self.attrs, f)
 
-    @staticmethod
-    def on_success(method, src, dest, result):
-        print(Fore.GREEN + str(method) + " success: " +
-              src + ("" if not dest else " --> " + dest))
+    def on_success(self, method, src, dest, result):
+        if self.args.verbose:
+            print(Fore.GREEN + str(method) + " success: " +
+                  src + ("" if not dest else " --> " + dest))
 
-    @staticmethod
-    def on_error(method, src, dest, result):
+    def on_error(self, method, src, dest, result):
         print(Fore.RED + str(method) + " success: " +
               src + ("" if not dest else " --> " + dest))
 
@@ -75,6 +77,7 @@ class Yui:
             path = self.args.args[0]
             if not self.fm.is_dir(path):
                 print(Fore.RED + "cd path should be a directory")
+                return
             path = self.fm.norm_path(path)
             self.root = path[1:] if path.startswith(self.fm.SEP) else self.root + path
         self.attrs["root"] = self.root
@@ -97,6 +100,7 @@ class Yui:
         """
         if len(self.args.args) != 2:
             print(Fore.RED + "'ul' needs 2 input arguments: src, dest")
+            return
         src = self.args.args[0]
         dest = self.args.args[1][1:] if self.args.args[1].startswith(self.fm.SEP) else self.root + self.args.args[1]
         try:
@@ -107,3 +111,37 @@ class Yui:
             print(Fore.RED + "'ul' encountered an error: \n" +
                   str(e))
 
+    def dl(self):
+        """
+        download
+        :return:
+        """
+        if len(self.args.args) != 2:
+            print(Fore.RED + "'dl' needs 2 input arguments: src, dest")
+            return
+        src = self.args.args[0][1:] if self.args.args[0].startswith(self.fm.SEP) else self.root + self.args.args[0]
+        dest = self.args.args[1]
+        try:
+            self.fm.download(src, dest,
+                             recursive=self.args.recursive,
+                             on_success=self.on_success, on_error=self.on_error)
+        except YuiException as e:
+            print(Fore.RED + "'dl' encountered an error: \n" +
+                  str(e))
+
+    def cp(self):
+        """
+        copy, recursive by default
+        :return:
+        """
+        if len(self.args.args) != 2:
+            print(Fore.RED + "'cp' needs 2 input arguments: src, dest")
+            return
+        src = self.args.args[0][1:] if self.args.args[0].startswith(self.fm.SEP) else self.root + self.args.args[0]
+        dest = self.args.args[1][1:] if self.args.args[1].startswith(self.fm.SEP) else self.root + self.args.args[1]
+        try:
+            self.fm.copy(src, dest,
+                         on_success=self.on_success, on_error=self.on_error)
+        except YuiException as e:
+            print(Fore.RED + "'cp' encountered an error: \n" +
+                  str(e))

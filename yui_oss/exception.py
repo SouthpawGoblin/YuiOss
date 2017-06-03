@@ -32,6 +32,13 @@ class YuiDeleteException(YuiException):
     pass
 
 
+class YuiCopyException(YuiException):
+    """
+    raised when error occurred while copying files
+    """
+    pass
+
+
 class YuiMoveException(YuiException):
     """
     raised when error occurred while moving/renaming files
@@ -42,12 +49,5 @@ class YuiMoveException(YuiException):
 class YuiListDirException(YuiException):
     """
     raised when error occurred while listing files
-    """
-    pass
-
-
-class YuiConsoleException(YuiException):
-    """
-    raised when error occurred while using console application commands
     """
     pass
