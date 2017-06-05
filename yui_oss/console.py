@@ -33,7 +33,7 @@ class Yui:
                 self.root = ""
 
         self.args = None
-        self.methods = ("cd", "ls", "ul", "dl", "cp")
+        self.methods = ("cd", "ls", "ul", "dl", "cp", "mv", "de")
 
         self.parser = ArgumentParser(description="YuiOss console application ver " + VERSION)
         self.parser.set_defaults(verbose=True)
@@ -89,15 +89,18 @@ class Yui:
         list sub directories and files of current directory
         :return:
         """
+        # TODO: needs optimization, remove common prefixes of results, don't list root itself
         files = [obj.key for obj in self.fm.list_dir(self.root, self.args.all)]
-        print((Fore.GREEN + "listing: /" + self.root + '\n' + '\t'.join(files)) if len(files)
-              else (Fore.YELLOW + "current directory: /" + self.root + " is empty."))
+        print((Fore.GREEN + "listing {0} files in /{1}:\n".format(len(files), self.root) +
+               '\t'.join(files)) if len(files)
+              else (Fore.YELLOW + "current directory: /{0} is empty.".format(self.root)))
 
     def ul(self):
         """
         upload
         :return:
         """
+        # TODO: make second param omitable, default to current directory
         if len(self.args.args) != 2:
             print(Fore.RED + "'ul' needs 2 input arguments: src, dest")
             return
@@ -144,4 +147,37 @@ class Yui:
                          on_success=self.on_success, on_error=self.on_error)
         except YuiException as e:
             print(Fore.RED + "'cp' encountered an error: \n" +
+                  str(e))
+
+    def mv(self):
+        """
+        move, recursive by default
+        :return:
+        """
+        if len(self.args.args) != 2:
+            print(Fore.RED + "'mv' needs 2 input arguments: src, dest")
+            return
+        src = self.args.args[0][1:] if self.args.args[0].startswith(self.fm.SEP) else self.root + self.args.args[0]
+        dest = self.args.args[1][1:] if self.args.args[1].startswith(self.fm.SEP) else self.root + self.args.args[1]
+        try:
+            self.fm.move(src, dest,
+                         on_success=self.on_success, on_error=self.on_error)
+        except YuiException as e:
+            print(Fore.RED + "'mv' encountered an error: \n" +
+                  str(e))
+
+    def de(self):
+        """
+        delete
+        :return:
+        """
+        if len(self.args.args) != 1:
+            print(Fore.RED + "'de' needs 1 input argument: src")
+            return
+        src = self.args.args[0][1:] if self.args.args[0].startswith(self.fm.SEP) else self.root + self.args.args[0]
+        try:
+            self.fm.delete(src, recursive=self.args.recursive,
+                           on_success=self.on_success, on_error=self.on_error)
+        except YuiException as e:
+            print(Fore.RED + "'de' encountered an error: \n" +
                   str(e))

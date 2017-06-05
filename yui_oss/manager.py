@@ -9,7 +9,7 @@ import binascii
 import base64
 
 
-VERSION = '0.0.1'
+VERSION = '1.0.0'
 
 
 class OssFileManager:
@@ -206,7 +206,7 @@ class OssFileManager:
                     raise YuiCopyException("destination directory is a sub-directory of the source directory")
                 prefix = self.SEP.join(remote_src.strip(self.SEP).split(self.SEP)[:-1]) + self.SEP
                 for subdir in self.list_dir(remote_src, True):
-                    new_path = subdir.key.replace(prefix, remote_dest)
+                    new_path = remote_dest + subdir.key if prefix == self.SEP else subdir.key.replace(prefix, remote_dest)
                     copy_single(subdir.key, new_path)
             else:
                 if self.is_dir(remote_dest):
@@ -246,7 +246,7 @@ class OssFileManager:
                     raise YuiMoveException("destination directory is a sub-directory of the source directory")
                 prefix = self.SEP.join(remote_old.strip(self.SEP).split(self.SEP)[:-1]) + self.SEP
                 for subdir in self.list_dir(remote_old, True):
-                    new_path = subdir.key.replace(prefix, remote_new)
+                    new_path = remote_new + subdir.key if prefix == self.SEP else subdir.key.replace(prefix, remote_new)
                     move_single(subdir.key, new_path)
             else:
                 if self.is_dir(remote_new):
