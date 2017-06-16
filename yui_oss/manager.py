@@ -129,10 +129,10 @@ class OssFileManager:
                 res = self.__bucket.get_object_to_file(rem, dest_loc,
                                                        progress_callback=progress_callback)
             if res != "mkdir" and res.status >= 400:
-                on_error("download", loc, rem, res) if on_error else None
+                on_error("download", rem, loc, res) if on_error else None
             else:
                 # print("object got | \"" + rem + "\" --> \"" + loc + "\"")
-                on_success("download", loc, rem, res) if on_success else None
+                on_success("download", rem, loc, res) if on_success else None
 
         try:
             local = os.path.abspath(local)

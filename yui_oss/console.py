@@ -119,6 +119,7 @@ class Yui:
         download
         :return:
         """
+        # TODO: make second param omitable, default to current directory
         if len(self.args.args) != 2:
             print(Fore.RED + "'dl' needs 2 input arguments: src, dest")
             return
