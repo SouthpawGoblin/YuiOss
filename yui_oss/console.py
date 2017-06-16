@@ -89,8 +89,7 @@ class Yui:
         list sub directories and files of current directory
         :return:
         """
-        # TODO: needs optimization, remove common prefixes of results, don't list root itself
-        files = [obj.key for obj in self.fm.list_dir(self.root, self.args.all)]
+        files = [obj.key.replace(self.root, '') for obj in self.fm.list_dir(self.root, self.args.all) if obj.key != self.root]
         print((Fore.GREEN + "listing {0} files in /{1}:\n".format(len(files), self.root) +
                '\t'.join(files)) if len(files)
               else (Fore.YELLOW + "current directory: /{0} is empty.".format(self.root)))
