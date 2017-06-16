@@ -33,7 +33,7 @@ class Yui:
                 self.root = ""
 
         self.args = None
-        self.methods = ("cd", "ls", "ul", "dl", "cp", "mv", "de")
+        self.methods = ("cd", "ls", "ul", "dl", "cp", "mv", "rm")
 
         self.parser = ArgumentParser(description="YuiOss console application ver " + VERSION)
         self.parser.set_defaults(verbose=True)
@@ -166,18 +166,18 @@ class Yui:
             print(Fore.RED + "'mv' encountered an error: \n" +
                   str(e))
 
-    def de(self):
+    def rm(self):
         """
         delete
         :return:
         """
         if len(self.args.args) != 1:
-            print(Fore.RED + "'de' needs 1 input argument: src")
+            print(Fore.RED + "'rm' needs 1 input argument: src")
             return
         src = self.args.args[0][1:] if self.args.args[0].startswith(self.fm.SEP) else self.root + self.args.args[0]
         try:
             self.fm.delete(src, recursive=self.args.recursive,
                            on_success=self.on_success, on_error=self.on_error)
         except YuiException as e:
-            print(Fore.RED + "'de' encountered an error: \n" +
+            print(Fore.RED + "'rm' encountered an error: \n" +
                   str(e))
