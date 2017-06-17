@@ -36,13 +36,17 @@ class OssFileManager:
         self.__service = oss2.Service(self.__auth, endpoint)
         self.__bucket = oss2.Bucket(self.__auth, endpoint, bucket_name, enable_crc=False, proxies=proxies)
 
+    @property
+    def bucket_name(self):
+        return self.__bucket.bucket_name
+
     def list_bucket(self):
         """
-        list all buckets under current auth_key, auth_key_secret and endpoint
-        :return: bucket iterator
+        list all bucket names under current auth_key, auth_key_secret and endpoint
+        :return: bucket name iterator
         """
         try:
-            return oss2.BucketIterator(self.__service)
+            return (bkt.bucket_name for bkt in oss2.BucketIterator(self.__service))
         except Exception as e:
             raise YuiListBucketException(e)
 

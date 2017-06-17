@@ -71,6 +71,7 @@ class Yui:
         :param path: new current directory, will be considered as absolute path if starts with '/'
         :return:
         """
+        self.basic_info_print()
         if not len(self.args.args):
             self.root = ""
         else:
@@ -89,6 +90,7 @@ class Yui:
         list sub directories and files of current directory
         :return:
         """
+        self.basic_info_print()
         files = [obj.key.replace(self.root, '') for obj in self.fm.list_dir(self.root, self.args.all) if obj.key != self.root]
         print((Fore.GREEN + "listing {0} files in /{1}:\n".format(len(files), self.root) +
                '\t'.join(files)) if len(files)
@@ -100,6 +102,7 @@ class Yui:
         :return:
         """
         # TODO: make second param omitable, default to current directory
+        self.basic_info_print()
         if len(self.args.args) != 2:
             print(Fore.RED + "'ul' needs 2 input arguments: src, dest")
             return
@@ -119,6 +122,7 @@ class Yui:
         :return:
         """
         # TODO: make second param omitable, default to current directory
+        self.basic_info_print()
         if len(self.args.args) != 2:
             print(Fore.RED + "'dl' needs 2 input arguments: src, dest")
             return
@@ -137,6 +141,7 @@ class Yui:
         copy, recursive by default
         :return:
         """
+        self.basic_info_print()
         if len(self.args.args) != 2:
             print(Fore.RED + "'cp' needs 2 input arguments: src, dest")
             return
@@ -154,6 +159,7 @@ class Yui:
         move, recursive by default
         :return:
         """
+        self.basic_info_print()
         if len(self.args.args) != 2:
             print(Fore.RED + "'mv' needs 2 input arguments: src, dest")
             return
@@ -171,6 +177,7 @@ class Yui:
         delete
         :return:
         """
+        self.basic_info_print()
         if len(self.args.args) != 1:
             print(Fore.RED + "'rm' needs 1 input argument: src")
             return
@@ -181,3 +188,7 @@ class Yui:
         except YuiException as e:
             print(Fore.RED + "'rm' encountered an error: \n" +
                   str(e))
+
+    def basic_info_print(self):
+        print(Fore.BLUE + "bucket@ " + self.fm.bucket_name + "\t" +
+              "root@ " + self.root + "\n")
