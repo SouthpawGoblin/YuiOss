@@ -25,11 +25,74 @@ class OssFileManager:
 
     MD5_HEADER_STRING = 'Content-MD5'
 
+    BUCKET_ACL_PUBLIC_READ = oss2.BUCKET_ACL_PUBLIC_READ
+    BUCKET_ACL_PUBLIC_READ_WRITE = oss2.BUCKET_ACL_PUBLIC_READ_WRITE
+    BUCKET_ACL_PRIVATE = oss2.BUCKET_ACL_PRIVATE
+
     SEP = '/'
 
     def __init__(self, auth_key, auth_key_secret, endpoint, bucket_name, proxies=None):
-        auth = oss2.Auth(auth_key, auth_key_secret)
-        self.__bucket = oss2.Bucket(auth, endpoint, bucket_name, enable_crc=False, proxies=proxies)
+        self.__auth = oss2.Auth(auth_key, auth_key_secret)
+        self.__service = oss2.Service(self.__auth, endpoint)
+        self.__bucket = oss2.Bucket(self.__auth, endpoint, bucket_name, enable_crc=False, proxies=proxies)
+
+    def list_bucket(self):
+        """
+        list all buckets under current auth_key, auth_key_secret and endpoint
+        :return: bucket iterator
+        """
+        try:
+            return oss2.BucketIterator(self.__service)
+        except Exception as e:
+            raise YuiListBucketException(e)
+
+    def change_bucket(self, name):
+        """
+        change current bucket to the given-named bucket, target bucket must be created first
+        :param name:
+        :return:
+        """
+        try:
+            tgt_bkt = oss2.Bucket(self.__auth, self.__service.endpoint, name)
+            if tgt_bkt not in self.list_bucket():
+                raise YuiChangeBucketException("target bucket does not exist, you may need to create it first")
+            self.__bucket = tgt_bkt
+        except Exception as e:
+            raise YuiChangeBucketException(e)
+
+    def create_bucket(self, name, acl=BUCKET_ACL_PRIVATE, stay=False):
+        """
+        create new bucket and change current bucket to it
+        :param name: bucket name, refer to oss2 docs for the naming rules
+        :param acl: bucket acl, default to oss2.BUCKET_ACL_PRIVATE
+        :param stay: if True, current bucket will not change to newly created bucket, default to False
+        :return:
+        """
+        try:
+            new_bkt = oss2.Bucket(self.__auth, self.__service.endpoint, name)
+            new_bkt.create_bucket(acl)
+            if not stay:
+                self.__bucket = new_bkt
+        except Exception as e:
+            raise YuiBucketException(e)
+
+    def delete_bucket(self, name):
+        """
+        delete a bucket, it must be empty
+        :param name:
+        :return:
+        """
+        try:
+            if name == self.__bucket.bucket_name:
+                raise YuiDeleteBucketException("target bucket can not be the current bucket")
+            tgt_bkt = oss2.Bucket(self.__auth, self.__service.endpoint, name)
+            tgt_bkt.delete_bucket()
+        except oss2.exceptions.BucketNotEmpty:
+            raise YuiDeleteBucketException("target bucket is not empty, can not be deleted")
+        except oss2.exceptions.NoSuchBucket:
+            raise YuiDeleteBucketException("target bucket does not exist")
+        except Exception as e:
+            raise YuiDeleteBucketException(e)
 
     def get_md5(self, remote):
         """
@@ -46,7 +109,7 @@ class OssFileManager:
             else:
                 return head.etag
         except Exception as e:
-            raise YuiException(e)
+            raise YuiGetMD5Exception(e)
 
     def is_exist(self, remote):
         """
@@ -58,7 +121,7 @@ class OssFileManager:
             remote = self.norm_path(remote)
             return self.__bucket.object_exists(remote)
         except Exception as e:
-            raise YuiException(e)
+            raise YuiIsExistException(e)
 
     def upload(self, local, remote, recursive=False, on_success=None, on_error=None, progress_callback=None):
         """
