@@ -3,7 +3,7 @@ class for manipulating objects
 """
 from . import utils
 from .exception import *
-import oss2
+import prox_oss2 as oss2
 import os
 import binascii
 import base64
