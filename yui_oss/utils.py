@@ -4,10 +4,8 @@
 utils
 """
 import hashlib
-import base64
 import requests
 import time
-import os.path as path
 
 
 def get_server_time():

@@ -6,7 +6,6 @@ from argparse import ArgumentParser
 from .manager import OssFileManager, VERSION
 from .exception import *
 import yaml
-import itertools
 
 
 class Yui:

@@ -1,22 +1,32 @@
-import sys
 from yui import VERSION
-from cx_Freeze import setup, Executable
+from setuptools import setup, find_packages
 
-# Dependencies are automatically detected, but it might need fine tuning.
-build_exe_options = {"packages": ["oss2"],
-                     "includes": [],
-                     "excludes": [],
-                     "include_files": ["config.yaml"]}
+setup(
+    name="YuiOss",
+    version=VERSION,
+    packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
+    scripts=['yui.py'],
 
-# GUI applications require a different base on Windows (the default is for a
-# console application).
-base = None
-# if sys.platform == "win32":
-#     base = "Win32GUI"
+    # Project uses reStructuredText, so ensure that the docutils get
+    # installed or upgraded on the target machine
+    install_requires=['docutils>=0.3',
+                      'prox_oss2>=2.3.2',
+                      'colorama>=0.3.9',
+                      'pyyaml>=3.12'],
 
-setup(name="YuiOss",
-      author="Roger_Qi",
-      version=VERSION,
-      description="Yui OSS console application",
-      options={"build_exe": build_exe_options},
-      executables=[Executable("yui.py", base=base)])
+    package_data={
+        # If any package contains *.txt or *.rst files, include them:
+        '': ['*.txt', '*.rst', 'config.yaml', '.yui']
+        # And include any *.msg files found in the 'hello' package, too:
+    },
+
+    # metadata for upload to PyPI
+    author="Roger_Qi",
+    author_email="goblin-qyz@163.com",
+    description="Yui OSS console application",
+    license="MIT",
+    keywords="oss console application",
+    url="https://github.com/Yinzhe-Qi/YuiOss",   # project home page, if any
+
+    # could also include long_description, download_url, classifiers, etc.
+)
