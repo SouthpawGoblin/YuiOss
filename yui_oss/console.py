@@ -64,6 +64,12 @@ class Yui:
         print(Fore.RED + str(method) + " success: " +
               src + ("" if not dest else " --> " + dest))
 
+    def on_progress(self, consumed_bytes, total_bytes):
+        if total_bytes:
+            rate = int(100 * (float(consumed_bytes) / float(total_bytes)))
+            end = '\n' if rate == 100 else ''
+            print('\rprogress: {0}%'.format(rate), end=end)
+
     def cd(self):
         """
         change oss current directory
@@ -109,7 +115,7 @@ class Yui:
         dest = self.args.args[1][1:] if self.args.args[1].startswith(self.fm.SEP) else self.root + self.args.args[1]
         try:
             self.fm.upload(src, dest,
-                           recursive=self.args.recursive,
+                           recursive=self.args.recursive, progress_callback=self.on_progress,
                            on_success=self.on_success, on_error=self.on_error)
         except YuiException as e:
             print(Fore.RED + "'ul' encountered an error: \n" +
@@ -129,7 +135,7 @@ class Yui:
         dest = self.args.args[1]
         try:
             self.fm.download(src, dest,
-                             recursive=self.args.recursive,
+                             recursive=self.args.recursive, progress_callback=self.on_progress,
                              on_success=self.on_success, on_error=self.on_error)
         except YuiException as e:
             print(Fore.RED + "'dl' encountered an error: \n" +
