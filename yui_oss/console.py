@@ -6,11 +6,16 @@ from argparse import ArgumentParser
 from .manager import OssFileManager, VERSION
 from .exception import *
 import yaml
+import sys
+import os
 
 
 class Yui:
 
-    ATTR_FILE = ".yui"
+    path = sys.path[0]
+    if os.path.isfile(path):
+        path = os.path.dirname(path)
+    ATTR_FILE = path + "/.yui"
 
     def __init__(self, config_file_path):
         with open(config_file_path, 'r') as f:
@@ -85,7 +90,17 @@ class Yui:
                 print(Fore.RED + "cd path should be a directory")
                 return
             path = self.fm.norm_path(path)
-            self.root = path[1:] if path.startswith(self.fm.SEP) else self.root + path
+            tmp_root = path[1:] if path.startswith(self.fm.SEP) else self.root + path
+            root_segs = tmp_root.split(self.fm.SEP)
+            new_root_segs = []
+            for seg in root_segs:
+                if seg == ".":
+                    continue
+                elif seg == "..":
+                    new_root_segs.pop() if len(new_root_segs) > 0 else None
+                else:
+                    new_root_segs.append(seg)
+            self.root = self.fm.SEP.join(new_root_segs)
         self.attrs["root"] = self.root
         self.update_attr()
         print(Fore.GREEN + "current directory changed to: /" + self.root)

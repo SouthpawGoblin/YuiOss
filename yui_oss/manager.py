@@ -346,7 +346,7 @@ class OssFileManager:
         :return:
         """
         remote_path = remote_path.strip()
-        isdir = True if remote_path.endswith((os.sep, OssFileManager.SEP)) else False
+        isdir = True if remote_path.endswith((os.sep, OssFileManager.SEP)) or remote_path.strip() in ['', '.', '..'] else False
         remote_path = os.path.normpath(remote_path).replace(os.sep, OssFileManager.SEP)
         if remote_path == '' or remote_path == OssFileManager.SEP:
             return OssFileManager.SEP
@@ -361,7 +361,7 @@ class OssFileManager:
         :param remote_path:
         :return:
         """
-        return True if remote_path.strip() == '' \
+        return True if remote_path.strip() in ['', '.', '..'] \
             else OssFileManager.norm_path(remote_path).endswith(OssFileManager.SEP)
 
     @staticmethod
