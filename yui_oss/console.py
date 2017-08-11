@@ -37,7 +37,7 @@ class Yui:
                 self.root = ""
 
         self.args = None
-        self.methods = ("cd", "ls", "ul", "dl", "cp", "mv", "rm")
+        self.methods = ("cd", "bkt", "ls", "ul", "dl", "cp", "mv", "rm")
 
         self.parser = ArgumentParser(description="YuiOss console application ver " + VERSION)
         self.parser.set_defaults(verbose=True)
@@ -45,6 +45,9 @@ class Yui:
         self.parser.add_argument("-q", "--quiet", dest="verbose", action="store_false")
         self.parser.add_argument("-a", "--all", action="store_true")
         self.parser.add_argument("-r", "--recursive", action="store_true")
+        self.parser.add_argument("-l", "--list", action="store_true")
+        self.parser.add_argument("-d", "--delete", action="store_true")
+        self.parser.add_argument("-c", "--create", action="store_true")
         self.parser.add_argument("method", choices=self.methods, nargs=1)
         self.parser.add_argument("args", nargs=argparse.ZERO_OR_MORE)
 
@@ -104,6 +107,23 @@ class Yui:
         self.attrs["root"] = self.root
         self.update_attr()
         print(Fore.GREEN + "current directory changed to: /" + self.root)
+
+    def bkt(self):
+        """
+        bucket related operations:
+        no optional parameter : change current bucket to the given bucket,
+                                if no bucket name argument is given, show current bucket name
+        -l, --list : list all bucket names
+        -d, --delete : delete bucket
+        -c, --create : create bucket
+        """
+        self.basic_info_print()
+        if self.args.list:
+            buckets = self.fm.list_bucket()
+            print(Fore.GREEN + "listing {0} buckets:\n".format(len(buckets)) + 
+                  '\t'.join(buckets) if len(buckets) 
+                  else (Fore.YELLOW + "there is no bucket"))
+            return
 
     def ls(self):
         """
