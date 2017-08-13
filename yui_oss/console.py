@@ -118,12 +118,30 @@ class Yui:
         -c, --create : create bucket
         """
         self.basic_info_print()
-        if self.args.list:
-            buckets = self.fm.list_bucket()
-            print(Fore.GREEN + "listing {0} buckets:\n".format(len(buckets)) + 
-                  '\t'.join(buckets) if len(buckets) 
-                  else (Fore.YELLOW + "there is no bucket"))
-            return
+        try:
+            # list bucket
+            if self.args.list:
+                buckets = self.fm.list_bucket()
+                print(Fore.GREEN + "listing {0} buckets:\n".format(len(buckets)) +
+                      '\t'.join(buckets) if len(buckets)
+                      else (Fore.YELLOW + "there is no bucket"))
+            # create bucket
+            elif self.args.create:
+                for bkt in self.args.args:
+                    self.fm.create_bucket(bkt)
+            # delete bucket
+            elif self.args.delete:
+                for bkt in self.args.args:
+                    self.fm.delete_bucket(bkt)
+            # show current bucket
+            elif len(self.args.args) < 1:
+                print(Fore.GREEN + "current bucket is : " + self.fm.bucket_name)
+            # change bucket
+            else:
+                self.fm.change_bucket(self.args.args[0])
+                print(Fore.GREEN + "current bucket changed to : " + self.fm.bucket_name)
+        except YuiException as e:
+            print(Fore.RED + e)
 
     def ls(self):
         """
@@ -141,13 +159,15 @@ class Yui:
         upload
         :return:
         """
-        # TODO: make second param omitable, default to current directory
         self.basic_info_print()
-        if len(self.args.args) != 2:
-            print(Fore.RED + "'ul' needs 2 input arguments: src, dest")
+        if len(self.args.args) < 1:
+            print(Fore.RED + "'ul' needs at least one input argument: src[, dest]")
             return
         src = self.args.args[0]
-        dest = self.args.args[1][1:] if self.args.args[1].startswith(self.fm.SEP) else self.root + self.args.args[1]
+        if len(self.args.args) < 2:
+            dest = self.root
+        else:
+            dest = self.args.args[1][1:] if self.args.args[1].startswith(self.fm.SEP) else self.root + self.args.args[1]
         try:
             self.fm.upload(src, dest,
                            recursive=self.args.recursive, progress_callback=self.on_progress,
@@ -161,13 +181,12 @@ class Yui:
         download
         :return:
         """
-        # TODO: make second param omitable, default to current directory
         self.basic_info_print()
-        if len(self.args.args) != 2:
-            print(Fore.RED + "'dl' needs 2 input arguments: src, dest")
+        if len(self.args.args) < 1:
+            print(Fore.RED + "'dl' needs at least 1 input argument: src[, dest]")
             return
         src = self.args.args[0][1:] if self.args.args[0].startswith(self.fm.SEP) else self.root + self.args.args[0]
-        dest = self.args.args[1]
+        dest = os.path.abspath(self.args.args[1]) if len(self.args.args) > 1 else os.path.abspath('.')
         try:
             self.fm.download(src, dest,
                              recursive=self.args.recursive, progress_callback=self.on_progress,
