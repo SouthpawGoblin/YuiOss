@@ -18,26 +18,44 @@ class Yui:
     ATTR_FILE = path + "/.yui"
 
     def __init__(self, config_file_path):
-        with open(config_file_path, 'r') as f:
-            self.config = yaml.load(f)
-            self.fm = OssFileManager(self.config["auth_key"],
-                                     self.config["auth_key_secret"],
-                                     self.config["endpoint"],
-                                     self.config["bucket_name"],
-                                     proxies=self.config["proxies"])
-
         try:
             with open(self.ATTR_FILE, 'r') as f:
                 self.attrs = yaml.load(f)
-                self.root = self.attrs["root"] if self.attrs and self.attrs["root"] else ""
+                self.profile = self.attrs["profile"] if self.attrs and "profile" in self.attrs else None
+                self.bucket = self.attrs["bucket"] if self.attrs and "bucket" in self.attrs else None
+                self.root = self.attrs["root"] if self.attrs and "root" in self.attrs else ""
         except FileNotFoundError:
             with open(self.ATTR_FILE, "w") as f:
-                self.attrs = {"root": ""}
+                self.attrs = {
+                    "profile": None,
+                    "bucket": None,
+                    "root": ""
+                }
                 yaml.dump(self.attrs, f)
+                self.profile = None
+                self.bucket = None
                 self.root = ""
 
+        with open(config_file_path, 'r') as f:
+            self.config = yaml.load(f)
+            profiles = self.config["profiles"]
+            if len(profiles.keys()):
+                if not self.profile or self.profile not in profiles.keys():
+                    self.profile = list(profiles.keys())[0]
+            if not self.bucket:
+                self.bucket = profiles[self.profile]["default_bucket"]
+
+        self.fm = OssFileManager(profiles[self.profile]["auth_key"],
+                                 profiles[self.profile]["auth_key_secret"],
+                                 profiles[self.profile]["endpoint"],
+                                 self.bucket,
+                                 proxies=self.config["proxies"])
+        self.attrs["profile"] = self.profile
+        self.attrs["bucket"] = self.bucket
+        self.update_attr()
+
         self.args = None
-        self.methods = ("cd", "bkt", "ls", "ul", "dl", "cp", "mv", "rm")
+        self.methods = ("cd", "pf", "bkt", "ls", "ul", "dl", "cp", "mv", "rm")
 
         self.parser = ArgumentParser(description="YuiOss console application ver " + VERSION)
         self.parser.set_defaults(verbose=True)
@@ -108,7 +126,46 @@ class Yui:
         self.update_attr()
         print(Fore.GREEN + "current directory changed to: /" + self.root)
 
+    def pf(self):
+        """
+        profile related operations:
+        no optional parameter : switch current profile to the given profile,
+                                if no profile name argument is given, show current profile name
+        -l, --list : list all profile names
+        :return:
+        """
+        self.basic_info_print()
+        try:
+            profiles = self.config["profiles"]
+            # list profile
+            if self.args.list:
+                print(Fore.GREEN + "listing {0} profiles:\n".format(len(profiles)) +
+                      '\t'.join(profiles.keys()) if len(profiles)
+                      else (Fore.YELLOW + "no profile found in config.yaml"))
+            # show current profile
+            elif len(self.args.args) < 1:
+                print(Fore.GREEN + "current profile is : " + self.profile)
+            # change profile
+            else:
+                if self.args.args[0] in profiles.keys():
+                    self.profile = self.args.args[0]
+                    self.bucket = profiles[self.profile]["default_bucket"]
+                    self.fm = OssFileManager(profiles[self.profile]["auth_key"],
+                                             profiles[self.profile]["auth_key_secret"],
+                                             profiles[self.profile]["endpoint"],
+                                             self.bucket,
+                                             proxies=self.config["proxies"])
+                    self.attrs["profile"] = self.profile
+                    self.attrs["bucket"] = self.bucket
+                    self.update_attr()
+                    print(Fore.GREEN + "current profile changed to : " + self.profile)
+                else:
+                    print(Fore.RED + "given profile name not found in config.yaml")
+        except YuiException as e:
+            print(Fore.RED + e)
+
     def bkt(self):
+        # FIXME: multiple bugs found
         """
         bucket related operations:
         no optional parameter : change current bucket to the given bucket,
@@ -139,6 +196,9 @@ class Yui:
             # change bucket
             else:
                 self.fm.change_bucket(self.args.args[0])
+                self.bucket = self.fm.bucket_name
+                self.attrs["bucket"] = self.bucket
+                self.update_attr()
                 print(Fore.GREEN + "current bucket changed to : " + self.fm.bucket_name)
         except YuiException as e:
             print(Fore.RED + e)

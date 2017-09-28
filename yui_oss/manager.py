@@ -32,6 +32,7 @@ class OssFileManager:
     SEP = '/'
 
     def __init__(self, auth_key, auth_key_secret, endpoint, bucket_name, proxies=None):
+        self.__proxies = proxies
         self.__auth = oss2.Auth(auth_key, auth_key_secret)
         self.__service = oss2.Service(self.__auth, endpoint)
         self.__bucket = oss2.Bucket(self.__auth, endpoint, bucket_name, enable_crc=False, proxies=proxies)
@@ -57,7 +58,7 @@ class OssFileManager:
         :return:
         """
         try:
-            tgt_bkt = oss2.Bucket(self.__auth, self.__service.endpoint, name)
+            tgt_bkt = oss2.Bucket(self.__auth, self.__service.endpoint, name, enable_crc=False, proxies=self.__proxies)
             if tgt_bkt not in self.list_bucket():
                 raise YuiChangeBucketException("target bucket does not exist, you may need to create it first")
             self.__bucket = tgt_bkt
@@ -73,7 +74,7 @@ class OssFileManager:
         :return:
         """
         try:
-            new_bkt = oss2.Bucket(self.__auth, self.__service.endpoint, name)
+            new_bkt = oss2.Bucket(self.__auth, self.__service.endpoint, name, enable_crc=False, proxies=self.__proxies)
             new_bkt.create_bucket(acl)
             if not stay:
                 self.__bucket = new_bkt

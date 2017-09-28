@@ -1,12 +1,19 @@
 # oss configurations
+profiles:
+  prof1:
+    auth_key:
+    auth_key_secret:
+    endpoint:
+    default_bucket:
 
-auth_key:
-auth_key_secret:
-endpoint:
-bucket_name:
+  prof2:
+    auth_key:
+    auth_key_secret:
+    endpoint:
+    default_bucket:
 
 proxies:
-#  http: http://user:pass@example.yuioss.com:8080
-#  https: http://user:pass@example.yuioss.com:8080
+  #  http: http://qiyzh:FIbo1123@dl-proxy.neusoft.com:8080
+  #  https: http://qiyzh:FIbo1123@dl-proxy.neusoft.com:8080
   http:
   https:
